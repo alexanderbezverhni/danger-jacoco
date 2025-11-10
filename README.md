@@ -40,6 +40,6 @@ to your `Dangerfile`
 5. Make your changes.
 
 ### How to release new version
-1. `bump version in lib/jacoco/gem_version.rb - X.Y.Z`
+1. Bump version in `lib/jacoco/gem_version.rb - X.Y.Z`
 2. `rake build`
 3. `gem push pkg/danger-jacoco-instacart-X.Y.Z.gem` 
