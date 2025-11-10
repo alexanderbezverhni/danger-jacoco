@@ -384,6 +384,78 @@ module Danger
           expect(@dangerfile.status_report[:markdowns][0].message).to include('| `com/example/CachedRepository` | 50% | 55% | :warning: |')
         end
       end
+
+      it 'test with kotlin multiples classes in same file' do
+        path_a = "#{File.dirname(__FILE__)}/fixtures/output_a.xml"
+
+        # Mock the Kotlin file with multiple classes
+        kotlin_file_path = 'src/kotlin/com/example/MultiClass.kt'
+        kotlin_file_content = <<~KOTLIN
+          package com.example
+
+          class MultiClass {
+            // some code
+          }
+
+          data class DataClass(val property: String) {
+            // some code
+          }
+
+          sealed class SealedClass {
+            // some code
+          }
+
+          private class PrivateClass {
+            // some code
+          }
+
+          abstract class AbstractClass {
+            // some code
+          }
+
+          class GenericClass<T> {
+            // some code
+          }
+
+          interface SomeInterface {
+            // some code
+          }
+
+          object SingletonObject {
+            // some code
+          }
+        KOTLIN
+
+        allow(File).to receive(:exist?).and_call_original
+        allow(File).to receive(:exist?).with(kotlin_file_path).and_return(true)
+        allow(File).to receive(:read).and_call_original
+        allow(File).to receive(:read).with(kotlin_file_path).and_return(kotlin_file_content)
+
+        @my_plugin.files_to_check = [kotlin_file_path]
+        @my_plugin.minimum_project_coverage_percentage = 0 # Avoid project coverage errors
+
+        # Use a block to capture the key-value pairs passed to classes
+        expect { |b| @my_plugin.classes(%r{/kotlin/}).each(&b) }.to yield_control.at_least(8).times
+
+        # Call report
+        @my_plugin.report path_a
+
+        # Check the class-to-file hash from SAXParser
+        class_file_hash = @my_plugin.classes(%r{/kotlin/})
+        expect(class_file_hash.keys).to include('com/example/MultiClass')
+        expect(class_file_hash.keys).to include('com/example/DataClass')
+        expect(class_file_hash.keys).to include('com/example/SealedClass')
+        expect(class_file_hash.keys).to include('com/example/PrivateClass')
+        expect(class_file_hash.keys).to include('com/example/AbstractClass')
+        expect(class_file_hash.keys).to include('com/example/GenericClass')
+        expect(class_file_hash.keys).to include('com/example/SomeInterface')
+        expect(class_file_hash.keys).to include('com/example/SingletonObject')
+
+        # All keys should map to the same file path
+        class_file_hash.each_value do |file_path|
+          expect(file_path).to eq(kotlin_file_path)
+        end
+      end
     end
   end
 end

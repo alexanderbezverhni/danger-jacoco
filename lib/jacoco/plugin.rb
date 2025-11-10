@@ -105,12 +105,53 @@ module Danger
 
     def classes(delimiter)
       class_to_file_path_hash = {}
-      files_to_check.select { |file| files_extension.reduce(false) { |state, el| state || file.end_with?(el) } }
-                    .each do |file| # "src/java/com/example/CachedRepository.java"
-                      classname = file.split('.').first.split(delimiter)[1] # "com/example/CachedRepository"
-                      class_to_file_path_hash[classname] = file
-                    end
+      # Initialize files_extension if it's nil
+      @files_extension = ['.kt', '.java'] if @files_extension.nil?
+
+      filtered_files_to_check.each do |file| # "src/java/com/example/CachedRepository.java"
+        # Get the package path
+        package_path = file.split('.').first.split(delimiter)[1] # "com/example/CachedRepository"
+        next unless package_path
+
+        # Add the primary class (filename-based class)
+        class_to_file_path_hash[package_path] = file
+
+        # For Kotlin files, we need to look for multiple classes/interfaces in the same file
+        add_kotlin_declarations(file, package_path, class_to_file_path_hash) if file.end_with?('.kt')
+      end
       class_to_file_path_hash
+    end
+
+    # Returns files that match the configured file extensions
+    def filtered_files_to_check
+      files_to_check.select { |file| @files_extension.reduce(false) { |state, el| state || file.end_with?(el) } }
+    end
+
+    # Scans a Kotlin file for additional class/interface declarations and adds them to the hash
+    def add_kotlin_declarations(file, package_path, class_to_file_path_hash)
+      return unless File.exist?(file)
+
+      file_content = File.read(file)
+
+      # Look for class and interface declarations in the file
+      # Regex catches class/interface/object declarations with modifiers and generics
+      regex = /\b(?:(?:data|sealed|abstract|open|internal|private|protected|public|inline)\s+)*
+               (?:class|interface|object)\s+([A-Za-z0-9_]+)(?:<.*?>)?/x
+      declarations = file_content.scan(regex).flatten
+
+      # For each additional class/interface found (excluding the one matching the filename)
+      declarations.each do |class_name|
+        # Skip if it matches the primary class name (already added)
+        next if package_path.end_with?("/#{class_name}")
+
+        # Create full class path by replacing the last part with the class name
+        parts = package_path.split('/')
+        parts[-1] = class_name
+        additional_class_path = parts.join('/')
+
+        # Add to hash
+        class_to_file_path_hash[additional_class_path] = file
+      end
     end
 
     # It returns a specific class code coverage and an emoji status as well
