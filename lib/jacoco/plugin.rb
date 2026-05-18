@@ -133,6 +133,12 @@ module Danger
 
       file_content = File.read(file)
 
+      # Kotlin compiles top-level functions (e.g. @Composable funs) into a `<FileNameKt>` class.
+      # Always register it — the SAX parser skips it silently if it's absent from the XML.
+      parts = package_path.split('/')
+      kt_class_path = (parts[0..-2] + ["#{parts[-1]}Kt"]).join('/')
+      class_to_file_path_hash[kt_class_path] = file
+
       # Look for class and interface declarations in the file
       # Regex catches class/interface/object declarations with modifiers and generics
       regex = /\b(?:(?:data|sealed|abstract|open|internal|private|protected|public|inline)\s+)*
