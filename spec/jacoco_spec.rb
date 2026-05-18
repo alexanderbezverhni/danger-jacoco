@@ -385,6 +385,38 @@ module Danger
         end
       end
 
+      it 'detects top-level Kotlin functions file via the generated Kt-suffixed class' do
+        path_g = "#{File.dirname(__FILE__)}/fixtures/output_g.xml"
+
+        kotlin_file_path = 'src/kotlin/com/example/TopLevelFunctions.kt'
+        kotlin_file_content = <<~KOTLIN
+          package com.example
+
+          @Composable
+          fun FirstComposable() {}
+
+          @Composable
+          fun SecondComposable() {}
+        KOTLIN
+
+        allow(File).to receive(:exist?).and_call_original
+        allow(File).to receive(:exist?).with(kotlin_file_path).and_return(true)
+        allow(File).to receive(:read).and_call_original
+        allow(File).to receive(:read).with(kotlin_file_path).and_return(kotlin_file_content)
+
+        @my_plugin.files_to_check = [kotlin_file_path]
+        @my_plugin.minimum_project_coverage_percentage = 0
+        @my_plugin.minimum_class_coverage_percentage = 80
+        @my_plugin.minimum_composable_class_coverage_percentage = 80
+
+        class_file_hash = @my_plugin.classes(%r{/kotlin/})
+        expect(class_file_hash.keys).to include('com/example/TopLevelFunctionsKt')
+
+        @my_plugin.report path_g
+
+        expect(@dangerfile.status_report[:markdowns][0].message).to include('| `com/example/TopLevelFunctionsKt` | 75% | 80% | :warning: |')
+      end
+
       it 'test with kotlin multiples classes in same file' do
         path_a = "#{File.dirname(__FILE__)}/fixtures/output_a.xml"
 
